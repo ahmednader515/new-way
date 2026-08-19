@@ -18,9 +18,9 @@ import {
   categoryIsManageableOnDashboard,
 } from "@/lib/db";
 
-type LessonInput = { title: string; titleAr?: string; videoUrl?: string; content?: string; pdfUrl?: string; acceptsHomework?: boolean };
+type LessonInput = { title: string; titleAr?: string; videoUrl?: string; content?: string; pdfUrl?: string; acceptsHomework?: boolean; homeworkImageUrl?: string };
 type QuestionOptionInput = { text: string; isCorrect: boolean };
-type QuestionInput = { type: "MULTIPLE_CHOICE" | "ESSAY" | "TRUE_FALSE"; questionText: string; options?: QuestionOptionInput[] };
+type QuestionInput = { type: "MULTIPLE_CHOICE" | "ESSAY" | "TRUE_FALSE"; questionText: string; questionImageUrl?: string; options?: QuestionOptionInput[] };
 type QuizInput = { title: string; timeLimitMinutes?: number | null; questions: QuestionInput[] };
 type ContentOrderEntry = { type: "lesson"; index: number } | { type: "quiz"; index: number };
 
@@ -162,6 +162,7 @@ export async function PUT(
       pdf_url: le.pdfUrl?.trim() || null,
       order: orderVal,
       accepts_homework: !!le.acceptsHomework,
+      homework_image_url: le.homeworkImageUrl?.trim() || null,
     });
   }
 
@@ -187,6 +188,7 @@ export async function PUT(
         quiz_id: quiz.id,
         type: qType,
         question_text: qt.questionText?.trim() || "",
+        question_image_url: qt.questionImageUrl?.trim() || null,
         order: qti + 1,
       });
       if ((qt.type === "MULTIPLE_CHOICE" || qt.type === "TRUE_FALSE") && Array.isArray(qt.options)) {
@@ -250,6 +252,7 @@ export async function GET(
       content: l.content,
       pdfUrl: l.pdfUrl ?? l.pdf_url,
       acceptsHomework: Boolean((l as { acceptsHomework?: boolean; accepts_homework?: boolean }).acceptsHomework ?? (l as { accepts_homework?: boolean }).accepts_homework ?? false),
+      homeworkImageUrl: String((l as { homeworkImageUrl?: string | null; homework_image_url?: string | null }).homeworkImageUrl ?? (l as { homework_image_url?: string | null }).homework_image_url ?? ""),
     })),
     quizzes: data.quizzes.map((q) => ({
       title: q.title,
@@ -257,6 +260,7 @@ export async function GET(
       questions: (q.questions ?? []).map((qt) => ({
         type: qt.type,
         questionText: qt.questionText ?? qt.question_text,
+        questionImageUrl: String((qt as { questionImageUrl?: string | null; question_image_url?: string | null }).questionImageUrl ?? (qt as { question_image_url?: string | null }).question_image_url ?? ""),
         options: (qt.options ?? []).map((o) => ({ text: o.text, isCorrect: o.isCorrect ?? o.is_correct })),
       })),
     })),

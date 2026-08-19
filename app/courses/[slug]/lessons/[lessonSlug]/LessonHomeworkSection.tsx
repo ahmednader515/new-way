@@ -12,7 +12,13 @@ type Submission = {
   created_at: string;
 };
 
-export function LessonHomeworkSection({ lessonId }: { lessonId: string }) {
+export function LessonHomeworkSection({
+  lessonId,
+  homeworkImageUrl,
+}: {
+  lessonId: string;
+  homeworkImageUrl?: string | null;
+}) {
   const router = useRouter();
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
@@ -136,6 +142,16 @@ export function LessonHomeworkSection({ lessonId }: { lessonId: string }) {
       <p className="mt-1 text-sm text-[var(--color-muted)]">
         يمكنك إرسال رابط أو ملف PDF أو صورة كواجب لهذه الحصة.
       </p>
+      {homeworkImageUrl ? (
+        <div className="mt-4">
+          <p className="mb-2 text-sm font-medium text-[var(--color-foreground)]">سؤال الواجب</p>
+          <img
+            src={homeworkImageUrl}
+            alt="سؤال الواجب"
+            className="max-h-[28rem] w-full max-w-2xl rounded-[var(--radius-btn)] border border-[var(--color-border)] object-contain"
+          />
+        </div>
+      ) : null}
       {error && (
         <div className="mt-3 rounded-[var(--radius-btn)] bg-red-500/10 px-3 py-2 text-sm text-red-600 dark:text-red-400">
           {error}

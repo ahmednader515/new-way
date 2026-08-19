@@ -351,6 +351,7 @@ export interface Lesson {
   order: number;
   course_id: string;
   accepts_homework?: boolean;
+  homework_image_url?: string | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -371,6 +372,7 @@ export interface Question {
   id: string;
   type: QuestionType;
   question_text: string;
+  question_image_url?: string | null;
   order: number;
   quiz_id: string;
   created_at: Date;
@@ -453,6 +455,7 @@ export interface LessonApp {
   duration?: number | null;
   order: number;
   courseId: string;
+  homeworkImageUrl?: string | null;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -470,6 +473,7 @@ export interface QuestionApp {
   id: string;
   type: QuestionType;
   questionText: string;
+  questionImageUrl?: string | null;
   order: number;
   quizId: string;
   options?: QuestionOptionApp[];

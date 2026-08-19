@@ -27,9 +27,9 @@ export async function GET() {
   }
 }
 
-type LessonInput = { title: string; titleAr?: string; videoUrl?: string; content?: string; pdfUrl?: string };
+type LessonInput = { title: string; titleAr?: string; videoUrl?: string; content?: string; pdfUrl?: string; homeworkImageUrl?: string };
 type QuestionOptionInput = { text: string; isCorrect: boolean };
-type QuestionInput = { type: "MULTIPLE_CHOICE" | "ESSAY" | "TRUE_FALSE"; questionText: string; options?: QuestionOptionInput[] };
+type QuestionInput = { type: "MULTIPLE_CHOICE" | "ESSAY" | "TRUE_FALSE"; questionText: string; questionImageUrl?: string; options?: QuestionOptionInput[] };
 type QuizInput = { title: string; timeLimitMinutes?: number | null; questions: QuestionInput[] };
 
 export async function POST(request: NextRequest) {
@@ -165,6 +165,7 @@ export async function POST(request: NextRequest) {
       pdf_url: le.pdfUrl?.trim() || null,
       order: orderVal,
       accepts_homework: !!(le as { acceptsHomework?: boolean }).acceptsHomework,
+      homework_image_url: le.homeworkImageUrl?.trim() || null,
     });
   }
 
@@ -189,6 +190,7 @@ export async function POST(request: NextRequest) {
         quiz_id: quiz.id,
         type: qType,
         question_text: qt.questionText?.trim() || "",
+        question_image_url: qt.questionImageUrl?.trim() || null,
         order: qti + 1,
       });
       if ((qt.type === "MULTIPLE_CHOICE" || qt.type === "TRUE_FALSE") && Array.isArray(qt.options)) {

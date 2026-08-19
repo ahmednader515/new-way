@@ -8,6 +8,7 @@ import {
   backfillMissingStudentCopyrightCodes,
 } from "@/lib/db";
 import { getServerTranslator } from "@/lib/i18n/server";
+import { userCreatedAtToIso } from "@/lib/i18n/account-dates";
 import { StudentsList } from "./StudentsList";
 import { StaffAccountsSection } from "./StaffAccountsSection";
 
@@ -51,6 +52,7 @@ export default async function StudentsPage() {
     student_number: s.student_number ?? null,
     guardian_number: s.guardian_number ?? null,
     copyright_code: (row.copyright_code as string | null | undefined) ?? (s as { copyright_code?: string | null }).copyright_code ?? null,
+    createdAt: userCreatedAtToIso(row.created_at ?? row.createdAt ?? s.created_at),
     _count: { enrollments: enrollmentsByUser[i].length },
     enrollments: enrollmentsByUser[i].map((e) => ({
       id: e.id,
@@ -79,8 +81,21 @@ export default async function StudentsPage() {
       </h2>
       {isAdmin && (
         <StaffAccountsSection
-          admins={admins.map((u) => ({ id: u.id, name: u.name, email: u.email, role: u.role }))}
-          assistantAdmins={assistantAdmins.map((u) => ({ id: u.id, name: u.name, email: u.email, role: u.role }))}
+          currentUserId={session.user.id}
+          admins={admins.map((u) => ({
+            id: u.id,
+            name: u.name,
+            email: u.email,
+            role: u.role,
+            createdAt: userCreatedAtToIso((u as { created_at?: unknown; createdAt?: unknown }).created_at ?? (u as { createdAt?: unknown }).createdAt),
+          }))}
+          assistantAdmins={assistantAdmins.map((u) => ({
+            id: u.id,
+            name: u.name,
+            email: u.email,
+            role: u.role,
+            createdAt: userCreatedAtToIso((u as { created_at?: unknown; createdAt?: unknown }).created_at ?? (u as { createdAt?: unknown }).createdAt),
+          }))}
         />
       )}
       <div className={isAdmin ? "mt-8" : ""}>
@@ -94,6 +109,7 @@ export default async function StudentsPage() {
           canAddBalance={isAdmin || isAssistant}
           canManageEnrollments={isAdmin}
           canEditFullProfile={isAdmin}
+          canDeleteAccount={isAdmin || isAssistant}
         />
       </div>
     </div>

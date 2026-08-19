@@ -4,13 +4,26 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useT } from "@/components/LocaleProvider";
 import { CourseFormSaveOverlay } from "../CourseFormSaveOverlay";
+import { ImageAttachField } from "@/components/ImageAttachField";
 
 type CategoryOption = { id: string; name: string; nameAr?: string | null };
-type LessonRow = { title: string; videoUrl: string; content: string; pdfUrl: string; acceptsHomework: boolean };
+type LessonRow = { title: string; videoUrl: string; content: string; pdfUrl: string; acceptsHomework: boolean; homeworkImageUrl: string };
 type QuestionOptionRow = { text: string; isCorrect: boolean };
-type QuestionRow = { type: "MULTIPLE_CHOICE" | "TRUE_FALSE"; questionText: string; options: QuestionOptionRow[] };
+type QuestionRow = { type: "MULTIPLE_CHOICE" | "TRUE_FALSE"; questionText: string; questionImageUrl: string; options: QuestionOptionRow[] };
 type QuizRow = { title: string; timeLimitMinutes: string; questions: QuestionRow[] };
 type ContentOrderEntry = { type: "lesson"; index: number } | { type: "quiz"; index: number };
+
+function questionHasBody(qt: { questionText: string; questionImageUrl: string }) {
+  return Boolean(qt.questionText.trim() || qt.questionImageUrl.trim());
+}
+
+function emptyQuestion(): QuestionRow {
+  return { type: "MULTIPLE_CHOICE", questionText: "", questionImageUrl: "", options: [{ text: "", isCorrect: false }] };
+}
+
+function emptyLesson(): LessonRow {
+  return { title: "", videoUrl: "", content: "", pdfUrl: "", acceptsHomework: false, homeworkImageUrl: "" };
+}
 
 export function CreateCourseForm() {
   const router = useRouter();
@@ -33,7 +46,7 @@ export function CreateCourseForm() {
     categoryNameAr: "",
     categoryNameEn: "",
   });
-  const [lessons, setLessons] = useState<LessonRow[]>([{ title: "", videoUrl: "", content: "", pdfUrl: "", acceptsHomework: false }]);
+  const [lessons, setLessons] = useState<LessonRow[]>([emptyLesson()]);
 
   const loadCategories = () => {
     fetch("/api/categories")
@@ -64,7 +77,7 @@ export function CreateCourseForm() {
     }
   }
 
-  const [quizzes, setQuizzes] = useState<QuizRow[]>([{ title: "", timeLimitMinutes: "", questions: [{ type: "MULTIPLE_CHOICE", questionText: "", options: [{ text: "", isCorrect: false }] }] }]);
+  const [quizzes, setQuizzes] = useState<QuizRow[]>([{ title: "", timeLimitMinutes: "", questions: [emptyQuestion()] }]);
   const [contentOrder, setContentOrder] = useState<ContentOrderEntry[]>([{ type: "lesson", index: 0 }, { type: "quiz", index: 0 }]);
   const [imageUploading, setImageUploading] = useState(false);
   const [imageUploadError, setImageUploadError] = useState("");
@@ -75,7 +88,7 @@ export function CreateCourseForm() {
   }
 
   function addLesson() {
-    setLessons((l) => [...l, { title: "", videoUrl: "", content: "", pdfUrl: "", acceptsHomework: false }]);
+    setLessons((l) => [...l, emptyLesson()]);
     setContentOrder((c) => [...c, { type: "lesson", index: c.filter((x) => x.type === "lesson").length }]);
   }
   function removeLesson(i: number) {
@@ -91,7 +104,7 @@ export function CreateCourseForm() {
   }
 
   function addQuiz() {
-    setQuizzes((q) => [...q, { title: "", timeLimitMinutes: "", questions: [{ type: "MULTIPLE_CHOICE", questionText: "", options: [{ text: "", isCorrect: false }] }] }]);
+    setQuizzes((q) => [...q, { title: "", timeLimitMinutes: "", questions: [emptyQuestion()] }]);
     setContentOrder((c) => [...c, { type: "quiz", index: c.filter((x) => x.type === "quiz").length }]);
   }
   function removeQuiz(qi: number) {
@@ -111,14 +124,14 @@ export function CreateCourseForm() {
   function addQuestion(qi: number) {
     setQuizzes((q) =>
       q.map((x, i) =>
-        i === qi ? { ...x, questions: [...x.questions, { type: "MULTIPLE_CHOICE" as const, questionText: "", options: [{ text: "", isCorrect: false }] }] } : x
+        i === qi ? { ...x, questions: [...x.questions, emptyQuestion()] } : x
       )
     );
   }
   function removeQuestion(qi: number, qti: number) {
     setQuizzes((q) => q.map((x, i) => (i === qi ? { ...x, questions: x.questions.filter((_, j) => j !== qti) } : x)));
   }
-  function updateQuestion(qi: number, qti: number, field: "type" | "questionText", value: string) {
+  function updateQuestion(qi: number, qti: number, field: "type" | "questionText" | "questionImageUrl", value: string) {
     setQuizzes((q) =>
       q.map((x, i) =>
         i === qi
@@ -205,7 +218,7 @@ export function CreateCourseForm() {
     const validLessons = lessons.filter((l) => l.title.trim());
     const validQuizzes = quizzes
       .filter((q) => q.title.trim())
-      .filter((q) => q.questions.some((qt) => qt.questionText.trim()) && q.questions.filter((qt) => qt.questionText.trim()).length > 0)
+      .filter((q) => q.questions.some(questionHasBody) && q.questions.filter(questionHasBody).length > 0)
       .map((q) => ({
         title: q.title.trim(),
         timeLimitMinutes: (() => {
@@ -213,10 +226,11 @@ export function CreateCourseForm() {
           return Number.isFinite(n) && n >= 1 ? n : undefined;
         })(),
         questions: q.questions
-          .filter((qt) => qt.questionText.trim())
+          .filter(questionHasBody)
           .map((qt) => ({
             type: qt.type,
             questionText: qt.questionText.trim(),
+            questionImageUrl: qt.questionImageUrl.trim() || undefined,
             options:
               qt.type === "MULTIPLE_CHOICE"
                 ? qt.options.filter((o) => o.text.trim()).map((o) => ({ text: o.text.trim(), isCorrect: o.isCorrect }))
@@ -227,7 +241,7 @@ export function CreateCourseForm() {
       }));
     const validLessonIndices = lessons.map((l, i) => (l.title.trim() ? i : -1)).filter((i) => i >= 0);
     const validQuizIndices = quizzes
-      .map((q, i) => (q.title.trim() && q.questions.some((qt) => qt.questionText.trim()) ? i : -1))
+      .map((q, i) => (q.title.trim() && q.questions.some(questionHasBody) ? i : -1))
       .filter((i) => i >= 0);
     const filteredContentOrder = contentOrder
       .filter(
@@ -260,6 +274,7 @@ export function CreateCourseForm() {
           content: l.content.trim() || undefined,
           pdfUrl: l.pdfUrl.trim() || undefined,
           acceptsHomework: l.acceptsHomework,
+          homeworkImageUrl: l.acceptsHomework ? l.homeworkImageUrl.trim() || undefined : undefined,
         })),
       quizzes: validQuizzes,
       contentOrder: filteredContentOrder,
@@ -577,6 +592,14 @@ export function CreateCourseForm() {
                 />
                 <span className="text-sm text-[var(--color-foreground)]">{t(`${Cf}.homeworkCheckbox`)}</span>
               </label>
+              {lesson.acceptsHomework ? (
+                <ImageAttachField
+                  value={lesson.homeworkImageUrl}
+                  onChange={(url) => updateLesson(i, "homeworkImageUrl", url)}
+                  label={t(`${Cf}.homeworkImageLabel`)}
+                  help={t(`${Cf}.homeworkImageHelp`)}
+                />
+              ) : null}
             </div>
           </div>
         ))}
@@ -651,6 +674,14 @@ export function CreateCourseForm() {
                   rows={2}
                   className="mb-2 w-full rounded border border-[var(--color-border)] bg-[var(--color-background)] px-2 py-1 text-sm"
                 />
+                <div className="mb-2">
+                  <ImageAttachField
+                    value={q.questionImageUrl}
+                    onChange={(url) => updateQuestion(qi, qti, "questionImageUrl", url)}
+                    label={t(`${Cf}.questionImageLabel`)}
+                    help={t(`${Cf}.questionImageHelp`)}
+                  />
+                </div>
                 {(q.type === "MULTIPLE_CHOICE" || q.type === "TRUE_FALSE") && (
                   <div className="space-y-1">
                     <p className="text-xs text-[var(--color-muted)]">

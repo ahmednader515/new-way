@@ -4,7 +4,8 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AddBalanceButton } from "./AddBalanceButton";
 import { useT } from "@/components/LocaleProvider";
-import { useDashboardTable } from "@/lib/i18n/dashboard-table";
+import { useDashboardTable, formatAccountCreatedAt } from "@/lib/i18n/dashboard-table";
+import { fillMessage } from "@/lib/i18n/interpolate";
 
 type Course = { id: string; title: string; titleAr: string | null; slug: string };
 
@@ -23,6 +24,7 @@ type Student = {
   student_number?: string | null;
   guardian_number?: string | null;
   copyright_code?: string | null;
+  createdAt?: string | null;
   _count: { enrollments: number };
   enrollments: Enrollment[];
 };
@@ -47,6 +49,7 @@ export function StudentsList({
   canAddBalance = false,
   canManageEnrollments = true,
   canEditFullProfile = true,
+  canDeleteAccount = false,
 }: {
   students: Student[];
   courses: Course[];
@@ -54,10 +57,11 @@ export function StudentsList({
   canAddBalance?: boolean;
   canManageEnrollments?: boolean;
   canEditFullProfile?: boolean;
+  canDeleteAccount?: boolean;
 }) {
   void isAdmin;
   const t = useT();
-  const { dir, thClass } = useDashboardTable();
+  const { dir, thClass, locale } = useDashboardTable();
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [editStudent, setEditStudent] = useState<Student | null>(null);
@@ -72,6 +76,7 @@ export function StudentsList({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [enrollError, setEnrollError] = useState("");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const dash = t("dashboard.studentsPage.dash", "—");
   const egp = t("common.egyptianPoundShort", "EGP");
@@ -162,7 +167,7 @@ export function StudentsList({
     const data = await res.json().catch(() => ({}));
     setLoading(false);
     if (!res.ok) {
-      setEnrollError(data.error ?? t("dashboard.studentsPage.errorAddCourseFailed", "Failed to add course"));
+      setEnrollError(data.error ?? t("dashboard.studentsPage.errorAddCourseFailed", "فشل إضافة الدورة"));
       return;
     }
     setAddCourseId("");
@@ -190,7 +195,7 @@ export function StudentsList({
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
       setEnrollError(
-        data.error ?? t("dashboard.studentsPage.errorRemoveCourseFailed", "Failed to remove course"),
+        data.error ?? t("dashboard.studentsPage.errorRemoveCourseFailed", "فشل إزالة الدورة"),
       );
       return;
     }
@@ -203,6 +208,27 @@ export function StudentsList({
         _count: { enrollments: prev._count.enrollments - 1 },
       };
     });
+  }
+
+  async function handleDeleteAccount(s: Student) {
+    const ok = window.confirm(
+      fillMessage(t("dashboard.studentsPage.confirmDeleteAccount", "حذف الحساب «{name}» نهائياً؟ لا يمكن التراجع."), {
+        name: s.name,
+      }),
+    );
+    if (!ok) return;
+    setError("");
+    setDeletingId(s.id);
+    const res = await fetch(`/api/dashboard/students/${s.id}`, { method: "DELETE" });
+    const data = await res.json().catch(() => ({}));
+    setDeletingId(null);
+    if (!res.ok) {
+      setError(data.error ?? t("dashboard.studentsPage.errorDeleteFailed", "فشل حذف الحساب"));
+      return;
+    }
+    if (editStudent?.id === s.id) setEditStudent(null);
+    if (coursesStudent?.id === s.id) setCoursesStudent(null);
+    router.refresh();
   }
 
   return (
@@ -226,6 +252,9 @@ export function StudentsList({
           className="mt-1 w-full max-w-md rounded-[var(--radius-btn)] border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2"
         />
       </div>
+      {error && !editStudent ? (
+        <p className="mb-3 text-sm text-red-600 dark:text-red-400">{error}</p>
+      ) : null}
       <div className="overflow-x-auto rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)]">
         <table dir={dir} className="w-full">
           <thead>
@@ -244,6 +273,10 @@ export function StudentsList({
                 <th className={thClass}>{t("dashboard.studentsPage.colManageCourses", "Manage courses")}</th>
               )}
               <th className={thClass}>{t("dashboard.studentsPage.colEdit", "Edit")}</th>
+              <th className={thClass}>{t("dashboard.studentsPage.colCreatedAt", "تاريخ الإنشاء")}</th>
+              {canDeleteAccount && (
+                <th className={thClass}>{t("dashboard.studentsPage.colDelete", "حذف الحساب")}</th>
+              )}
             </tr>
           </thead>
           <tbody>
@@ -285,6 +318,23 @@ export function StudentsList({
                     {t("dashboard.studentsPage.edit", "Edit")}
                   </button>
                 </td>
+                <td className="p-3 whitespace-nowrap text-sm text-[var(--color-muted)]">
+                  {formatAccountCreatedAt(s.createdAt, locale, dash)}
+                </td>
+                {canDeleteAccount && (
+                  <td className="p-3">
+                    <button
+                      type="button"
+                      onClick={() => void handleDeleteAccount(s)}
+                      disabled={deletingId === s.id}
+                      className="text-sm font-medium text-red-600 hover:underline disabled:opacity-50 dark:text-red-400"
+                    >
+                      {deletingId === s.id
+                        ? t("dashboard.studentsPage.deletingAccount", "جاري الحذف...")
+                        : t("dashboard.studentsPage.deleteAccount", "حذف الحساب")}
+                    </button>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
@@ -396,6 +446,12 @@ export function StudentsList({
             </h3>
             <form onSubmit={handleSaveEdit} className="mt-4 space-y-3">
               {error ? <p className="text-sm text-red-600 dark:text-red-400">{error}</p> : null}
+              <p className="text-sm text-[var(--color-muted)]">
+                <span className="font-medium text-[var(--color-foreground)]">
+                  {t("dashboard.studentsPage.createdAtLabel", "Account created:")}{" "}
+                </span>
+                {formatAccountCreatedAt(editStudent.createdAt, locale, dash)}
+              </p>
               {editStudent.copyright_code ? (
                 <p className="rounded-[var(--radius-btn)] border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-sm text-[var(--color-muted)]">
                   <span className="font-medium text-[var(--color-foreground)]">

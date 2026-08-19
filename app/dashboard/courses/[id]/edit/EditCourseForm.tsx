@@ -4,17 +4,18 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useT } from "@/components/LocaleProvider";
 import { CourseFormSaveOverlay } from "../../CourseFormSaveOverlay";
+import { ImageAttachField } from "@/components/ImageAttachField";
 
 type CategoryOption = { id: string; name: string; nameAr?: string | null };
-type LessonRow = { title: string; videoUrl: string; content: string; pdfUrl: string; acceptsHomework: boolean };
+type LessonRow = { title: string; videoUrl: string; content: string; pdfUrl: string; acceptsHomework: boolean; homeworkImageUrl: string };
 type QuestionOptionRow = { text: string; isCorrect: boolean };
-type QuestionRow = { type: "MULTIPLE_CHOICE" | "TRUE_FALSE"; questionText: string; options: QuestionOptionRow[] };
+type QuestionRow = { type: "MULTIPLE_CHOICE" | "TRUE_FALSE"; questionText: string; questionImageUrl: string; options: QuestionOptionRow[] };
 type QuizRow = { title: string; timeLimitMinutes: string; questions: QuestionRow[] };
 
 export type ContentOrderEntry = { type: "lesson"; index: number } | { type: "quiz"; index: number };
 
 /** API payloads may include legacy ESSAY questions. */
-type InitialQuestionRow = { type: "MULTIPLE_CHOICE" | "ESSAY" | "TRUE_FALSE"; questionText: string; options?: QuestionOptionRow[] };
+type InitialQuestionRow = { type: "MULTIPLE_CHOICE" | "ESSAY" | "TRUE_FALSE"; questionText: string; questionImageUrl?: string; options?: QuestionOptionRow[] };
 type InitialQuizRow = { title: string; timeLimitMinutes?: number | null; questions: InitialQuestionRow[] };
 
 type InitialData = {
@@ -35,8 +36,16 @@ type InitialData = {
   contentOrder: ContentOrderEntry[];
 };
 
-const defaultLesson: LessonRow = { title: "", videoUrl: "", content: "", pdfUrl: "", acceptsHomework: false };
-const defaultQuiz: QuizRow = { title: "", timeLimitMinutes: "", questions: [{ type: "MULTIPLE_CHOICE", questionText: "", options: [{ text: "", isCorrect: false }] }] };
+const defaultLesson: LessonRow = { title: "", videoUrl: "", content: "", pdfUrl: "", acceptsHomework: false, homeworkImageUrl: "" };
+const defaultQuiz: QuizRow = { title: "", timeLimitMinutes: "", questions: [{ type: "MULTIPLE_CHOICE", questionText: "", questionImageUrl: "", options: [{ text: "", isCorrect: false }] }] };
+
+function questionHasBody(qt: { questionText: string; questionImageUrl: string }) {
+  return Boolean(qt.questionText.trim() || qt.questionImageUrl.trim());
+}
+
+function emptyQuestion(): QuestionRow {
+  return { type: "MULTIPLE_CHOICE", questionText: "", questionImageUrl: "", options: [{ text: "", isCorrect: false }] };
+}
 
 export function EditCourseForm({ courseId, initialData }: { courseId: string; initialData: InitialData }) {
   const router = useRouter();
@@ -70,6 +79,7 @@ export function EditCourseForm({ courseId, initialData }: { courseId: string; in
           const r = l as Record<string, unknown>;
           return {
             ...l,
+            homeworkImageUrl: String(r.homeworkImageUrl ?? r.homework_image_url ?? l.homeworkImageUrl ?? ""),
             acceptsHomework: Boolean(r.acceptsHomework ?? r.accepts_homework ?? false),
           };
         })
@@ -121,9 +131,9 @@ export function EditCourseForm({ courseId, initialData }: { courseId: string; in
                     : qt.options?.length
                       ? qt.options
                       : [{ text: "", isCorrect: false }];
-                return { type, questionText: qt.questionText, options };
+                return { type, questionText: qt.questionText, questionImageUrl: qt.questionImageUrl ?? "", options };
               })
-            : [{ type: "MULTIPLE_CHOICE" as const, questionText: "", options: [{ text: "", isCorrect: false }] }],
+            : [emptyQuestion()],
         }))
       : [defaultQuiz]
   );
@@ -156,7 +166,7 @@ export function EditCourseForm({ courseId, initialData }: { courseId: string; in
   }
 
   function addQuiz() {
-    setQuizzes((q) => [...q, { ...defaultQuiz }]);
+    setQuizzes((q) => [...q, { title: "", timeLimitMinutes: "", questions: [emptyQuestion()] }]);
     setContentOrder((c) => [...c, { type: "quiz", index: c.filter((x) => x.type === "quiz").length }]);
   }
   function removeQuiz(qi: number) {
@@ -176,14 +186,14 @@ export function EditCourseForm({ courseId, initialData }: { courseId: string; in
   function addQuestion(qi: number) {
     setQuizzes((q) =>
       q.map((x, i) =>
-        i === qi ? { ...x, questions: [...x.questions, { type: "MULTIPLE_CHOICE" as const, questionText: "", options: [{ text: "", isCorrect: false }] }] } : x
+        i === qi ? { ...x, questions: [...x.questions, emptyQuestion()] } : x
       )
     );
   }
   function removeQuestion(qi: number, qti: number) {
     setQuizzes((q) => q.map((x, i) => (i === qi ? { ...x, questions: x.questions.filter((_, j) => j !== qti) } : x)));
   }
-  function updateQuestion(qi: number, qti: number, field: "type" | "questionText", value: string) {
+  function updateQuestion(qi: number, qti: number, field: "type" | "questionText" | "questionImageUrl", value: string) {
     setQuizzes((q) =>
       q.map((x, i) =>
         i === qi ? { ...x, questions: x.questions.map((qt, j) => (j === qti ? { ...qt, [field]: value } : qt)) } : x
@@ -262,7 +272,7 @@ export function EditCourseForm({ courseId, initialData }: { courseId: string; in
     const validLessons = lessons.filter((l) => l.title.trim());
     const validQuizzes = quizzes
       .filter((q) => q.title.trim())
-      .filter((q) => q.questions.some((qt) => qt.questionText.trim()) && q.questions.filter((qt) => qt.questionText.trim()).length > 0)
+      .filter((q) => q.questions.some(questionHasBody) && q.questions.filter(questionHasBody).length > 0)
       .map((q) => ({
         title: q.title.trim(),
         timeLimitMinutes: (() => {
@@ -270,10 +280,11 @@ export function EditCourseForm({ courseId, initialData }: { courseId: string; in
           return Number.isFinite(n) && n >= 1 ? n : undefined;
         })(),
         questions: q.questions
-          .filter((qt) => qt.questionText.trim())
+          .filter(questionHasBody)
           .map((qt) => ({
             type: qt.type,
             questionText: qt.questionText.trim(),
+            questionImageUrl: qt.questionImageUrl.trim() || undefined,
             options:
               qt.type === "MULTIPLE_CHOICE"
                 ? qt.options.filter((o) => o.text.trim()).map((o) => ({ text: o.text.trim(), isCorrect: o.isCorrect }))
@@ -284,7 +295,7 @@ export function EditCourseForm({ courseId, initialData }: { courseId: string; in
       }));
     const validLessonIndices = lessons.map((l, i) => (l.title.trim() ? i : -1)).filter((i) => i >= 0);
     const validQuizIndices = quizzes
-      .map((q, i) => (q.title.trim() && q.questions.some((qt) => qt.questionText.trim()) ? i : -1))
+      .map((q, i) => (q.title.trim() && q.questions.some(questionHasBody) ? i : -1))
       .filter((i) => i >= 0);
     const filteredContentOrder = contentOrder
       .filter(
@@ -317,6 +328,7 @@ export function EditCourseForm({ courseId, initialData }: { courseId: string; in
         content: l.content.trim() || undefined,
         pdfUrl: l.pdfUrl.trim() || undefined,
         acceptsHomework: l.acceptsHomework,
+        homeworkImageUrl: l.acceptsHomework ? l.homeworkImageUrl.trim() || undefined : undefined,
       })),
       quizzes: validQuizzes,
       contentOrder: filteredContentOrder,
@@ -547,6 +559,14 @@ export function EditCourseForm({ courseId, initialData }: { courseId: string; in
                 <input type="checkbox" checked={lesson.acceptsHomework} onChange={(e) => updateLesson(i, "acceptsHomework", e.target.checked)} className="rounded border-[var(--color-border)]" />
                 <span className="text-sm text-[var(--color-foreground)]">{t(`${Cf}.homeworkCheckbox`)}</span>
               </label>
+              {lesson.acceptsHomework ? (
+                <ImageAttachField
+                  value={lesson.homeworkImageUrl}
+                  onChange={(url) => updateLesson(i, "homeworkImageUrl", url)}
+                  label={t(`${Cf}.homeworkImageLabel`)}
+                  help={t(`${Cf}.homeworkImageHelp`)}
+                />
+              ) : null}
             </div>
           </div>
         ))}
@@ -589,6 +609,14 @@ export function EditCourseForm({ courseId, initialData }: { courseId: string; in
                   )}
                 </div>
                 <textarea value={q.questionText} onChange={(e) => updateQuestion(qi, qti, "questionText", e.target.value)} placeholder={t(`${Cf}.questionTextPlaceholder`)} rows={2} className="mb-2 w-full rounded border border-[var(--color-border)] bg-[var(--color-background)] px-2 py-1 text-sm" />
+                <div className="mb-2">
+                  <ImageAttachField
+                    value={q.questionImageUrl}
+                    onChange={(url) => updateQuestion(qi, qti, "questionImageUrl", url)}
+                    label={t(`${Cf}.questionImageLabel`)}
+                    help={t(`${Cf}.questionImageHelp`)}
+                  />
+                </div>
                 {(q.type === "MULTIPLE_CHOICE" || q.type === "TRUE_FALSE") && (
                   <div className="space-y-1">
                     <p className="text-xs text-[var(--color-muted)]">

@@ -101,10 +101,11 @@ model Quiz {
 }
 
 model Question {
-  id           String       @id @default(cuid())
-  type         QuestionType
-  questionText String       @map("question_text") @db.Text
-  order        Int          @default(0)
+  id               String       @id @default(cuid())
+  type             QuestionType
+  questionText     String       @map("question_text") @db.Text
+  questionImageUrl String?      @map("question_image_url")
+  order            Int          @default(0)
   quizId       String       @map("quiz_id")
   createdAt    DateTime     @default(now()) @map("created_at")
   updatedAt    DateTime     @updatedAt @map("updated_at")
@@ -145,16 +146,17 @@ model QuizAttempt {
 }
 
 model Lesson {
-  id        String   @id @default(cuid())
-  title     String
-  titleAr   String?  @map("title_ar")
-  slug      String
-  content   String?  @db.Text
-  videoUrl  String?  @map("video_url")
-  pdfUrl    String?  @map("pdf_url")
-  duration  Int?     // بالدقائق (اختياري - غير مستخدم في النموذج)
-  order     Int      @default(0)
-  courseId  String   @map("course_id")
+  id               String   @id @default(cuid())
+  title            String
+  titleAr          String?  @map("title_ar")
+  slug             String
+  content          String?  @db.Text
+  videoUrl         String?  @map("video_url")
+  pdfUrl           String?  @map("pdf_url")
+  duration         Int?     // بالدقائق (اختياري - غير مستخدم في النموذج)
+  order            Int      @default(0)
+  courseId         String   @map("course_id")
+  homeworkImageUrl String?  @map("homework_image_url")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
   course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)

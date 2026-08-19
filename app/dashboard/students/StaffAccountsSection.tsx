@@ -3,9 +3,10 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useT } from "@/components/LocaleProvider";
-import { useDashboardTable } from "@/lib/i18n/dashboard-table";
+import { useDashboardTable, formatAccountCreatedAt } from "@/lib/i18n/dashboard-table";
+import { fillMessage } from "@/lib/i18n/interpolate";
 
-type UserRow = { id: string; name: string | null; email: string | null; role: string };
+type UserRow = { id: string; name: string | null; email: string | null; role: string; createdAt?: string | null };
 
 const ROLE_HEADER_KEYS: Record<string, string> = {
   ADMIN: "header.role.ADMIN",
@@ -23,12 +24,14 @@ function translateRole(role: string, t: (key: string, fallback?: string) => stri
 export function StaffAccountsSection({
   admins,
   assistantAdmins,
+  currentUserId,
 }: {
   admins: UserRow[];
   assistantAdmins: UserRow[];
+  currentUserId: string;
 }) {
   const t = useT();
-  const { dir, thClassCompact } = useDashboardTable();
+  const { dir, thClassCompact, locale } = useDashboardTable();
   const router = useRouter();
   const [editUser, setEditUser] = useState<UserRow | null>(null);
   const [editName, setEditName] = useState("");
@@ -37,6 +40,7 @@ export function StaffAccountsSection({
   const [editPassword, setEditPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const staff = [
     ...admins.map((u) => ({ ...u, roleLabel: translateRole(u.role, t) })),
@@ -79,6 +83,30 @@ export function StaffAccountsSection({
     router.refresh();
   }
 
+  async function handleDelete(u: UserRow) {
+    if (u.id === currentUserId) {
+      setError(t("dashboard.studentsPage.cannotDeleteSelf", "لا يمكن حذف حسابك الحالي"));
+      return;
+    }
+    const ok = window.confirm(
+      fillMessage(t("dashboard.studentsPage.confirmDeleteAccount", "حذف الحساب «{name}» نهائياً؟ لا يمكن التراجع."), {
+        name: u.name ?? u.email ?? u.id,
+      }),
+    );
+    if (!ok) return;
+    setError("");
+    setDeletingId(u.id);
+    const res = await fetch(`/api/dashboard/students/${u.id}`, { method: "DELETE" });
+    const data = await res.json().catch(() => ({}));
+    setDeletingId(null);
+    if (!res.ok) {
+      setError(data.error ?? t("dashboard.studentsPage.errorDeleteFailed", "فشل حذف الحساب"));
+      return;
+    }
+    if (editUser?.id === u.id) setEditUser(null);
+    router.refresh();
+  }
+
   if (staff.length === 0) return null;
 
   const dash = t("dashboard.studentsPage.dash", "—");
@@ -88,6 +116,9 @@ export function StaffAccountsSection({
       <h3 className="mb-4 text-lg font-semibold text-[var(--color-foreground)]">
         {t("dashboard.studentsPage.staffTableTitle", "Admin and assistant admin accounts")}
       </h3>
+      {error && !editUser ? (
+        <p className="mb-3 text-sm text-red-600 dark:text-red-400">{error}</p>
+      ) : null}
       <div className="overflow-x-auto">
         <table dir={dir} className="w-full text-sm">
           <thead>
@@ -95,7 +126,9 @@ export function StaffAccountsSection({
               <th className={thClassCompact}>{t("dashboard.studentsPage.colName", "Name")}</th>
               <th className={thClassCompact}>{t("dashboard.studentsPage.colEmailFull", "Email")}</th>
               <th className={thClassCompact}>{t("dashboard.studentsPage.colRole", "Role")}</th>
+              <th className={thClassCompact}>{t("dashboard.studentsPage.colCreatedAt", "تاريخ الإنشاء")}</th>
               <th className={thClassCompact}>{t("dashboard.studentsPage.colEdit", "Edit")}</th>
+              <th className={thClassCompact}>{t("dashboard.studentsPage.colDelete", "حذف الحساب")}</th>
             </tr>
           </thead>
           <tbody>
@@ -104,6 +137,9 @@ export function StaffAccountsSection({
                 <td className="py-2 px-3 text-[var(--color-foreground)]">{u.name ?? dash}</td>
                 <td className="py-2 px-3 text-[var(--color-muted)]">{u.email ?? dash}</td>
                 <td className="py-2 px-3 text-[var(--color-foreground)]">{u.roleLabel}</td>
+                <td className="py-2 px-3 whitespace-nowrap text-[var(--color-muted)]">
+                  {formatAccountCreatedAt(u.createdAt, locale, dash)}
+                </td>
                 <td className="py-2 px-3">
                   <button
                     type="button"
@@ -111,6 +147,18 @@ export function StaffAccountsSection({
                     className="text-sm font-medium text-[var(--color-primary)] hover:underline"
                   >
                     {t("dashboard.studentsPage.edit", "Edit")}
+                  </button>
+                </td>
+                <td className="py-2 px-3">
+                  <button
+                    type="button"
+                    onClick={() => void handleDelete(u)}
+                    disabled={deletingId === u.id || u.id === currentUserId}
+                    className="text-sm font-medium text-red-600 hover:underline disabled:opacity-50 dark:text-red-400"
+                  >
+                    {deletingId === u.id
+                      ? t("dashboard.studentsPage.deletingAccount", "جاري الحذف...")
+                      : t("dashboard.studentsPage.deleteAccount", "حذف الحساب")}
                   </button>
                 </td>
               </tr>
@@ -131,6 +179,12 @@ export function StaffAccountsSection({
             </h3>
             <form onSubmit={handleSave} className="mt-4 space-y-3">
               {error ? <p className="text-sm text-red-600 dark:text-red-400">{error}</p> : null}
+              <p className="text-sm text-[var(--color-muted)]">
+                <span className="font-medium text-[var(--color-foreground)]">
+                  {t("dashboard.studentsPage.createdAtLabel", "Account created:")}{" "}
+                </span>
+                {formatAccountCreatedAt(editUser.createdAt, locale, dash)}
+              </p>
               <div>
                 <label className="block text-sm font-medium text-[var(--color-foreground)]">
                   {t("dashboard.studentsPage.nameLabel", "Name")}

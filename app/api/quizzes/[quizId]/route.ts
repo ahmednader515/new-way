@@ -92,6 +92,7 @@ export async function GET(
         id: q.id,
         type: q.type,
         questionText: q.questionText ?? q.question_text,
+        questionImageUrl: q.questionImageUrl ?? q.question_image_url ?? null,
         order: q.order,
         options: (q.options ?? []).map((o: Record<string, unknown>) => ({
           id: o.id,

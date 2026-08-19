@@ -77,6 +77,7 @@ export default async function EditCoursePage({ params }: Props) {
         content: String(row.content ?? ""),
         pdfUrl: String(row.pdfUrl ?? row.pdf_url ?? ""),
         acceptsHomework: Boolean(row.acceptsHomework ?? row.accepts_homework ?? false),
+        homeworkImageUrl: String(row.homeworkImageUrl ?? row.homework_image_url ?? ""),
       };
     }),
     quizzes: data.quizzes.map((q) => {
@@ -95,6 +96,7 @@ export default async function EditCoursePage({ params }: Props) {
         questions: questions.map((qt) => ({
           type: (qt.type === "ESSAY" || qt.type === "TRUE_FALSE" ? qt.type : "MULTIPLE_CHOICE") as "MULTIPLE_CHOICE" | "ESSAY" | "TRUE_FALSE",
           questionText: String(qt.questionText ?? qt.question_text ?? ""),
+          questionImageUrl: String(qt.questionImageUrl ?? qt.question_image_url ?? ""),
           options: ((qt.options ?? []) as Array<Record<string, unknown>>).map((o) => ({
             text: String(o.text ?? ""),
             isCorrect: Boolean(o.isCorrect ?? o.is_correct),

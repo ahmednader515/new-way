@@ -16,6 +16,7 @@ export type QuizApiPayload = {
     id: string;
     type: string;
     questionText: string;
+    questionImageUrl?: string | null;
     order: number;
     options: Array<{ id: string; text: string; isCorrect: boolean }>;
   }>;

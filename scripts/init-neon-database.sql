@@ -95,6 +95,7 @@ CREATE TABLE IF NOT EXISTS "Question" (
   quiz_id       TEXT NOT NULL REFERENCES "Quiz"(id) ON DELETE CASCADE,
   type          TEXT NOT NULL CHECK (type IN ('MULTIPLE_CHOICE', 'ESSAY', 'TRUE_FALSE')),
   question_text TEXT NOT NULL,
+  question_image_url TEXT,
   "order"       INT NOT NULL DEFAULT 0,
   created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()

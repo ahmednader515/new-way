@@ -2,7 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { hash } from "bcryptjs";
 import { authOptions } from "@/lib/auth";
-import { getUserById, getUserByEmailExcludingId, updateUser, clearCurrentSessionId } from "@/lib/db";
+import {
+  getUserById,
+  getUserByEmailExcludingId,
+  updateUser,
+  clearCurrentSessionId,
+  deleteUserAccount,
+  countUsersByRole,
+} from "@/lib/db";
 
 const ROLES = ["ADMIN", "ASSISTANT_ADMIN", "STUDENT"] as const;
 
@@ -65,6 +72,58 @@ export async function PATCH(
 
   if (data.role !== undefined) {
     await clearCurrentSessionId(id);
+  }
+
+  return NextResponse.json({ success: true });
+}
+
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await getServerSession(authOptions);
+  if (!session || (session.user.role !== "ADMIN" && session.user.role !== "ASSISTANT_ADMIN")) {
+    return NextResponse.json({ error: "غير مصرح" }, { status: 403 });
+  }
+
+  const { id } = await params;
+  if (id === session.user.id) {
+    return NextResponse.json({ error: "لا يمكن حذف حسابك الحالي" }, { status: 400 });
+  }
+
+  const targetUser = await getUserById(id);
+  if (!targetUser) {
+    return NextResponse.json({ error: "المستخدم غير موجود" }, { status: 404 });
+  }
+
+  const isAssistant = session.user.role === "ASSISTANT_ADMIN";
+  if (isAssistant && targetUser.role !== "STUDENT") {
+    return NextResponse.json({ error: "يمكنك حذف حسابات الطلاب فقط" }, { status: 403 });
+  }
+
+  if (targetUser.role === "ADMIN") {
+    const adminCount = await countUsersByRole("ADMIN");
+    if (adminCount <= 1) {
+      return NextResponse.json({ error: "لا يمكن حذف آخر حساب أدمن" }, { status: 400 });
+    }
+  }
+
+  try {
+    await deleteUserAccount(id);
+  } catch (e) {
+    console.error("DELETE /api/dashboard/students/[id]", e);
+    const raw = e instanceof Error ? e.message : String(e);
+    const lower = raw.toLowerCase();
+    if (lower.includes("foreign key") || lower.includes("violates")) {
+      return NextResponse.json(
+        {
+          error:
+            "تعذر الحذف بسبب ارتباطات أخرى في قاعدة البيانات. احذف الارتباطات أولاً أو تواصل مع الدعم.",
+        },
+        { status: 409 },
+      );
+    }
+    return NextResponse.json({ error: "فشل حذف الحساب", detail: raw }, { status: 500 });
   }
 
   return NextResponse.json({ success: true });

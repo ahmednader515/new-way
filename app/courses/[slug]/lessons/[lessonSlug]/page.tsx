@@ -200,7 +200,16 @@ export default async function LessonPage({ params }: Props) {
           ) : null}
 
           {Boolean(lessonObj.acceptsHomework ?? lessonObj.accepts_homework) && (
-            <LessonHomeworkSection lessonId={String(lessonObj.id)} />
+            <LessonHomeworkSection
+              lessonId={String(lessonObj.id)}
+              homeworkImageUrl={
+                typeof lessonObj.homeworkImageUrl === "string"
+                  ? lessonObj.homeworkImageUrl
+                  : typeof lessonObj.homework_image_url === "string"
+                    ? lessonObj.homework_image_url
+                    : null
+              }
+            />
           )}
 
           {isStudent ? <LessonRatingSection lessonId={String(lessonObj.id)} /> : null}

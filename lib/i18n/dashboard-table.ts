@@ -2,7 +2,6 @@
 
 import { useLocale } from "@/components/LocaleProvider";
 import { getDir } from "@/lib/i18n/core";
-import type { Locale } from "@/lib/i18n/types";
 
 /** Table + header alignment: English → logical start (left), Arabic → logical start (right). */
 export function useDashboardTable() {
@@ -15,6 +14,4 @@ export function useDashboardTable() {
   return { locale, dir, thClass, thClassCompact };
 }
 
-export function dateLocaleForUi(locale: Locale): string {
-  return locale === "ar" ? "ar-EG" : "en-GB";
-}
+export { dateLocaleForUi, userCreatedAtToIso, formatAccountCreatedAt } from "@/lib/i18n/account-dates";

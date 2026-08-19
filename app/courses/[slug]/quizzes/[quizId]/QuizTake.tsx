@@ -221,8 +221,15 @@ export function QuizTake({ quiz }: { quiz: QuizApiPayload }) {
           className="rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-6"
         >
           <p className="font-medium text-[var(--color-foreground)]">
-            {i + 1}. {q.questionText}
+            {i + 1}.{q.questionText ? ` ${q.questionText}` : ""}
           </p>
+          {q.questionImageUrl ? (
+            <img
+              src={q.questionImageUrl}
+              alt={t("quiz.questionImageAlt", "Question image")}
+              className="mt-3 max-h-[28rem] w-full max-w-2xl rounded-[var(--radius-btn)] border border-[var(--color-border)] object-contain"
+            />
+          ) : null}
           <span className="mt-1 block text-xs text-[var(--color-muted)]">
             {q.type === "MULTIPLE_CHOICE"
               ? t("quiz.multipleChoice", "Multiple choice")

@@ -101,6 +101,7 @@ CREATE TABLE IF NOT EXISTS "Question" (
   quiz_id       TEXT NOT NULL REFERENCES "Quiz"(id) ON DELETE CASCADE,
   type          TEXT NOT NULL CHECK (type IN ('MULTIPLE_CHOICE', 'ESSAY', 'TRUE_FALSE')),
   question_text TEXT NOT NULL,
+  question_image_url TEXT,
   "order"       INT NOT NULL DEFAULT 0,
   created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -449,6 +450,8 @@ ALTER TABLE "User" ADD COLUMN IF NOT EXISTS teacher_homepage_order INTEGER;
 -- ============================================================
 ALTER TABLE "Course" ADD COLUMN IF NOT EXISTS accepts_homework BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE "Lesson" ADD COLUMN IF NOT EXISTS accepts_homework BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "Lesson" ADD COLUMN IF NOT EXISTS homework_image_url TEXT;
+ALTER TABLE "Question" ADD COLUMN IF NOT EXISTS question_image_url TEXT;
 
 CREATE TABLE IF NOT EXISTS "HomeworkSubmission" (
   id              TEXT PRIMARY KEY,

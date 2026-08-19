@@ -3672,23 +3672,31 @@ export async function createLesson(data: {
   pdf_url?: string | null;
   order: number;
   accepts_homework?: boolean;
+  homework_image_url?: string | null;
 }): Promise<Lesson> {
   const id = generateId();
   const acceptsHomework = data.accepts_homework ?? false;
-  try {
+  const homeworkImageUrl = data.homework_image_url?.trim() || null;
+  const insertLesson = async () => {
     await sql`
-      INSERT INTO "Lesson" (id, course_id, title, title_ar, slug, content, video_url, pdf_url, "order", accepts_homework)
-      VALUES (${id}, ${data.course_id}, ${data.title}, ${data.title_ar ?? null}, ${data.slug}, ${data.content ?? null}, ${data.video_url ?? null}, ${data.pdf_url ?? null}, ${data.order}, ${acceptsHomework})
+      INSERT INTO "Lesson" (id, course_id, title, title_ar, slug, content, video_url, pdf_url, "order", accepts_homework, homework_image_url)
+      VALUES (${id}, ${data.course_id}, ${data.title}, ${data.title_ar ?? null}, ${data.slug}, ${data.content ?? null}, ${data.video_url ?? null}, ${data.pdf_url ?? null}, ${data.order}, ${acceptsHomework}, ${homeworkImageUrl})
     `;
+  };
+  try {
+    await insertLesson();
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    const columnMissing = msg.includes("accepts_homework") || (msg.includes("column") && msg.includes("does not exist"));
+    const code = typeof (err as { code?: string })?.code === "string" ? (err as { code: string }).code : "";
+    const columnMissing =
+      code === "42703" ||
+      msg.includes("accepts_homework") ||
+      msg.includes("homework_image_url") ||
+      (msg.includes("column") && msg.includes("does not exist"));
     if (columnMissing) {
       await sql`ALTER TABLE "Lesson" ADD COLUMN IF NOT EXISTS accepts_homework BOOLEAN NOT NULL DEFAULT false`;
-      await sql`
-        INSERT INTO "Lesson" (id, course_id, title, title_ar, slug, content, video_url, pdf_url, "order", accepts_homework)
-        VALUES (${id}, ${data.course_id}, ${data.title}, ${data.title_ar ?? null}, ${data.slug}, ${data.content ?? null}, ${data.video_url ?? null}, ${data.pdf_url ?? null}, ${data.order}, ${acceptsHomework})
-      `;
+      await sql`ALTER TABLE "Lesson" ADD COLUMN IF NOT EXISTS homework_image_url TEXT`;
+      await insertLesson();
     } else throw err;
   }
   const l = await getLessonById(id);
@@ -3838,13 +3846,31 @@ export async function createQuestion(data: {
   quiz_id: string;
   type: "MULTIPLE_CHOICE" | "ESSAY" | "TRUE_FALSE";
   question_text: string;
+  question_image_url?: string | null;
   order: number;
 }): Promise<Question> {
   const id = generateId();
-  await sql`
-    INSERT INTO "Question" (id, quiz_id, type, question_text, "order")
-    VALUES (${id}, ${data.quiz_id}, ${data.type}, ${data.question_text}, ${data.order})
-  `;
+  const imageUrl = data.question_image_url?.trim() || null;
+  const insertQuestion = async () => {
+    await sql`
+      INSERT INTO "Question" (id, quiz_id, type, question_text, question_image_url, "order")
+      VALUES (${id}, ${data.quiz_id}, ${data.type}, ${data.question_text}, ${imageUrl}, ${data.order})
+    `;
+  };
+  try {
+    await insertQuestion();
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    const code = typeof (err as { code?: string })?.code === "string" ? (err as { code: string }).code : "";
+    const columnMissing =
+      code === "42703" ||
+      msg.includes("question_image_url") ||
+      (msg.includes("column") && msg.includes("does not exist"));
+    if (columnMissing) {
+      await sql`ALTER TABLE "Question" ADD COLUMN IF NOT EXISTS question_image_url TEXT`;
+      await insertQuestion();
+    } else throw err;
+  }
   const rows = await sql`SELECT * FROM "Question" WHERE id = ${id} LIMIT 1`;
   const q = rows[0] as Question;
   if (!q) throw new Error("فشل إنشاء السؤال");
@@ -4802,12 +4828,81 @@ export async function getUsersByRole(role: UserRole): Promise<User[]> {
   return rows as User[];
 }
 
-/** حذف حساب مدرس — يتحقق من الرتبة قبل الحذف (دوراته تبقى مع created_by_id = null إن كان القيد كذلك في قاعدة البيانات) */
+async function ignoreMissingRelation(run: () => Promise<unknown>): Promise<void> {
+  try {
+    await run();
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    const code = typeof (err as { code?: string })?.code === "string" ? (err as { code: string }).code : "";
+    if (code === "42P01" || /does not exist/i.test(msg)) return;
+    throw err;
+  }
+}
+
+/** حذف حساب مستخدم مع فك الارتباطات حتى لا يفشل القيد الأجنبي */
+export async function deleteUserAccount(userId: string): Promise<void> {
+  const u = await getUserById(userId);
+  if (!u) throw new Error("المستخدم غير موجود");
+
+  await ignoreMissingRelation(async () => {
+    await sql`
+      DELETE FROM "Message"
+      WHERE sender_id = ${userId}
+         OR conversation_id IN (
+           SELECT id FROM "Conversation"
+           WHERE staff_user_id = ${userId} OR student_user_id = ${userId}
+         )
+    `;
+  });
+  await ignoreMissingRelation(async () => {
+    await sql`
+      DELETE FROM "Conversation"
+      WHERE staff_user_id = ${userId} OR student_user_id = ${userId}
+    `;
+  });
+  await ignoreMissingRelation(async () => {
+    await sql`DELETE FROM "HomeworkSubmission" WHERE user_id = ${userId}`;
+  });
+  await ignoreMissingRelation(async () => {
+    await sql`DELETE FROM "QuizAttempt" WHERE user_id = ${userId}`;
+  });
+  await ignoreMissingRelation(async () => {
+    await sql`DELETE FROM "Enrollment" WHERE user_id = ${userId}`;
+  });
+  await ignoreMissingRelation(async () => {
+    await sql`DELETE FROM "LessonRating" WHERE user_id = ${userId}`;
+  });
+  await ignoreMissingRelation(async () => {
+    await sql`DELETE FROM "UserStorePurchase" WHERE user_id = ${userId}`;
+  });
+  await ignoreMissingRelation(async () => {
+    await sql`DELETE FROM "UserPlatformSubscription" WHERE user_id = ${userId}`;
+  });
+  await ignoreMissingRelation(async () => {
+    await sql`UPDATE "PasswordChangeRequest" SET processed_by_id = NULL WHERE processed_by_id = ${userId}`;
+  });
+  await ignoreMissingRelation(async () => {
+    await sql`DELETE FROM "PasswordChangeRequest" WHERE user_id = ${userId}`;
+  });
+  await ignoreMissingRelation(async () => {
+    await sql`UPDATE "ActivationCode" SET used_by_user_id = NULL WHERE used_by_user_id = ${userId}`;
+  });
+  await ignoreMissingRelation(async () => {
+    await sql`UPDATE "Course" SET created_by_id = NULL WHERE created_by_id = ${userId}`;
+  });
+  await ignoreMissingRelation(async () => {
+    await sql`UPDATE "Category" SET created_by_id = NULL WHERE created_by_id = ${userId}`;
+  });
+
+  await sql`DELETE FROM "User" WHERE id = ${userId}`;
+}
+
+/** حذف حساب مدرس — يتحقق من الرتبة قبل الحذف (دوراته تبقى مع created_by_id = null) */
 export async function deleteTeacherUser(userId: string): Promise<void> {
   const u = await getUserById(userId);
   if (!u) throw new Error("المستخدم غير موجود");
   if (u.role !== "TEACHER") throw new Error("يمكن حذف حسابات المدرسين فقط");
-  await sql`DELETE FROM "User" WHERE id = ${userId}`;
+  await deleteUserAccount(userId);
 }
 
 /** طلاب لديهم تسجيل في أي كورس أنشأه المدرس */

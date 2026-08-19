@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useT } from "@/components/LocaleProvider";
-import { useDashboardTable } from "@/lib/i18n/dashboard-table";
+import { useDashboardTable, formatAccountCreatedAt } from "@/lib/i18n/dashboard-table";
 import { fillMessage } from "@/lib/i18n/interpolate";
 
 export type TeacherRow = {
