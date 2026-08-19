@@ -4,6 +4,7 @@ import Link from "next/link";
 import { authOptions } from "@/lib/auth";
 import { ensureTeacherHomepageOrderColumn, getTeachersFeatureEnabled, getUsersByRole } from "@/lib/db";
 import { userCreatedAtToIso } from "@/lib/i18n/account-dates";
+import { getServerTranslator } from "@/lib/i18n/server";
 import { TeachersAdminClient } from "./TeachersAdminClient";
 
 function normalizeTeacherHomepageOrder(v: unknown): number | null {
