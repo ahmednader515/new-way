@@ -65,6 +65,7 @@ export function PlyrVideoPlayer({
   const [isPlayerReady, setIsPlayerReady] = useState(false);
   const [fullscreenContainer, setFullscreenContainer] = useState<Element | null>(null);
   const [qualityDialogOpen, setQualityDialogOpen] = useState(false);
+  const [, setOverlayTick] = useState(0);
 
   const progressStorageKey =
     storageKey ? `video-progress-${storageKey}` : `video-progress-yt-${youtubeVideoId}`;
@@ -229,6 +230,7 @@ export function PlyrVideoPlayer({
       player.on("ready", () => {
         if (isCancelled) return;
         setIsPlayerReady(true);
+        setOverlayTick((n) => n + 1);
         seekToSaved();
       });
 
@@ -319,10 +321,12 @@ export function PlyrVideoPlayer({
     </div>
   );
 
+  const overlayTarget = fullscreenContainer ?? playerRootRef.current;
   const overlayControls =
     !qualityDialogOpen &&
     isPlayerReady &&
-    (fullscreenContainer ? createPortal(seekControls, fullscreenContainer) : seekControls);
+    overlayTarget &&
+    createPortal(seekControls, overlayTarget);
 
   return (
     <div ref={playerRootRef} className={`lesson-plyr-video relative h-full w-full ${className}`.trim()}>

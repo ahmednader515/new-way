@@ -501,7 +501,8 @@ html:not(.light):not(.dark) .home-teachers-hero-blend {
 }
 
 [data-video-controls] {
-  z-index: 30;
+  z-index: 9999;
+  pointer-events: auto;
 }
 
 .plyr--fullscreen-fallback [data-video-controls],

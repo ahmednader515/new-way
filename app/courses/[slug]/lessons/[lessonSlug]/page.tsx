@@ -10,7 +10,7 @@ import {
   ensureUserCopyrightCode,
   getHomepageSettings,
 } from "@/lib/db";
-import { PlyrVideoPlayer } from "@/components/plyr-video-player";
+import { LessonWatchShell } from "@/components/LessonWatchShell";
 import { VideoCopyrightOverlay } from "@/components/video-copyright-overlay";
 import { getYouTubeVideoId } from "@/lib/youtube";
 import { CourseOutlineSidebar } from "@/components/CourseOutlineSidebar";
@@ -159,24 +159,22 @@ export default async function LessonPage({ params }: Props) {
         <article className="min-w-0 lg:col-start-1 lg:row-start-1">
           <h1 className="text-2xl font-bold text-[var(--color-foreground)]">{lessonTitle}</h1>
 
-          {youtubeVideoId && (
-            <div className="lesson-video-shell mt-6 relative w-full min-w-0 rounded-[var(--radius-card)] border border-[var(--color-border)] bg-black">
-              <PlyrVideoPlayer
-                key={`${lessonObj.id}-${youtubeVideoId}`}
-                youtubeVideoId={youtubeVideoId}
-                storageKey={String(lessonObj.id)}
-                className="w-full"
-              />
-              {studentCopyrightCode?.trim() ? (
-                <VideoCopyrightOverlay
-                  code={studentCopyrightCode.trim()}
-                  label={t("video.copyrightCode", "Copyright code")}
-                  dir={locale === "ar" ? "rtl" : "ltr"}
-                  style={copyrightOverlayStyle}
-                />
-              ) : null}
-            </div>
-          )}
+          {youtubeVideoId ? (
+            <LessonWatchShell
+              youtubeVideoId={youtubeVideoId}
+              storageKey={String(lessonObj.id)}
+              copyrightOverlay={
+                studentCopyrightCode?.trim() ? (
+                  <VideoCopyrightOverlay
+                    code={studentCopyrightCode.trim()}
+                    label={t("video.copyrightCode", "Copyright code")}
+                    dir={locale === "ar" ? "rtl" : "ltr"}
+                    style={copyrightOverlayStyle}
+                  />
+                ) : null
+              }
+            />
+          ) : null}
 
           {(lessonObj.pdfUrl ?? lessonObj.pdf_url) ? (
             <div className="mt-6">
