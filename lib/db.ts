@@ -1418,7 +1418,9 @@ async function fetchHomepageSettingsFromDb(): Promise<HomepageSetting> {
     /* Schema ensures run on update/admin paths only — not on every public homepage read. */
     const rows = await sql`SELECT * FROM "HomepageSetting" WHERE id = 'default' LIMIT 1`;
     const row = rows[0] as Record<string, unknown> | undefined;
-    if (!row) return HOMEPAGE_DEFAULTS;
+    if (!row) {
+      throw new Error('Homepage settings row "default" is missing');
+    }
     const c = rowToCamel(row) as Record<string, unknown>;
     /* أعمدة hero_float_image_1/2/3 تتحول إلى heroFloatImage_1 لا heroFloatImage1 فنقرأ من الصف الخام */
     const heroFloat1 = row.hero_float_image_1 != null && String(row.hero_float_image_1).trim() !== "" ? String(row.hero_float_image_1).trim() : null;
@@ -1929,15 +1931,19 @@ async function fetchHomepageSettingsFromDb(): Promise<HomepageSetting> {
         return s === "watermark" ? "watermark" : "floating";
       })(),
     };
-  } catch {
-    return HOMEPAGE_DEFAULTS;
+  } catch (error) {
+    // Reject failed reads so unstable_cache never stores demo data or overwrites
+    // the last successful settings during background revalidation.
+    console.error("Failed to load homepage settings:", error);
+    throw error;
   }
 }
 
 /** Cross-request cache — homepage settings change rarely; invalidated on admin save. */
 const getHomepageSettingsCached = unstable_cache(
   fetchHomepageSettingsFromDb,
-  ["homepage-settings-v1"],
+  // New key discards any demo defaults cached by the old error fallback.
+  ["homepage-settings-v2"],
   { revalidate: 60, tags: [HOMEPAGE_SETTINGS_TAG] },
 );
 

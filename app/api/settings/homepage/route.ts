@@ -9,8 +9,8 @@ export async function GET() {
   } catch (error) {
     console.error("API settings/homepage:", error);
     return NextResponse.json(
-      { teacherImageUrl: "/instructor.png", heroTitle: "أستاذ / عصام محي", heroSlogan: "ادرسها... يمكن تفهم المعلومة صح!", platformName: "منصة أستاذ عصام محي" },
-      { status: 200 }
+      { error: "Homepage settings are temporarily unavailable" },
+      { status: 503, headers: { "Cache-Control": "no-store" } }
     );
   }
 }
